@@ -1,4 +1,5 @@
 import random
+from collections import Counter
 
 class Dice:
 
@@ -23,6 +24,11 @@ class Player:
         self.minimum_quantity_wager = 0
         # percent of the unsure dice that must be applicable to wager this is for computer purposes
         self.percent_of_unsure_must_be_applicable = 0.000
+
+
+    def print_wager(self):
+        print(f'{self.name} quantity wager: {self.quantity_wager}')
+        print(f'{self.name} die wager: {self.die_wager}')
 
     def fill_hand(self):
         while len(self.player_hand) < 4:
@@ -70,7 +76,6 @@ class Player:
 
 
     def clear_player_wagers(self):
-
         self.die_wager = 0
         self.quantity_wager = 0
 
@@ -202,11 +207,9 @@ class ComputerPlayer(Player):
                 self.die6[1] += 1.06
 
     def find_max(self):
-
         die_counter_list = []
         for die in self.die_list:
             die_counter_list.append(die[1])
-
         max_counter = max(die_counter_list)
         for die in self.die_list:
             if die[1] == max_counter:
@@ -245,39 +248,33 @@ class ComputerPlayer(Player):
             die[0] = 0
             die[1] = 0
 
-    def wager(self, game):
-        self.calculate_the_minimum_wager_quantity(game)
-        self.calculate_odds_of_required_wager(game)
-        # The die object that the computer will use as wager
-        max_die = self.find_max()
-        # required quantity wager for wager
-        minimum_quantity_wager = self.minimum_quantity_wager
-
-        # setting the game quantity wager to the cover amount
-        game.quantity_wager = minimum_quantity_wager
-        self.quantity_wager = minimum_quantity_wager
-        print(f'{self.name} quantity wager: {minimum_quantity_wager}')
-
-        # setting the game die wager to the number of the dice the comp poses the most of
-        game.die_wager = max_die[2]
-        self.die_wager = max_die[2]
-        print(f'{self.name} die wager: {max_die[2]}')
-
-        self.clear_die_counters()
+    def wager(self, game, dice_vals, most_common):
+        if most_common[1] > game.quantity_wager or (most_common[1] == game.quantity_wager and most_common[0] > game.die_wager):
+            game.quantity_wager = most_common[1]
+            game.die_wager = most_common[0]
+        elif most_common[1] >= 2 and most_common[0] != game.die_wager and game.quantity_wager <= 3 * most_common[1]:
+            if most_common[0] <= game.die_wager:
+                game.quantity_wager += 1
+            game.die_wager = most_common[0]
+        elif dice_vals.count(game.die_wager) >= 1 and game.quantity_wager <= 3 * dice_vals.count(game.die_wager):
+            game.quantity_wager += 1
+        self.quantity_wager = game.quantity_wager
+        self.die_wager = game.die_wager
+        self.print_wager()
         game.add_next_active_player()
 
     def decide(self, game):
-        if self.percent_of_unsure_must_be_applicable >= self.threshold_percent:
+        dice_vals = [i.rolled_number for i in self.player_hand]
+        most_common = Counter(dice_vals).most_common(1)[0]
+        if (most_common[1] > game.quantity_wager or (most_common[1] == game.quantity_wager and most_common[0] > game.die_wager))\
+                or (most_common[1] >= 2 and most_common[0] != game.die_wager and game.quantity_wager <= 3 * most_common[1])\
+                or (dice_vals.count(game.die_wager) >= 1 and game.quantity_wager <= 3 * dice_vals.count(game.die_wager)):
+            self.wager(game, dice_vals, most_common)
+        else:
             self.call_liar(game)
-        elif self.percent_of_unsure_must_be_applicable < self.threshold_percent:
-            self.wager(game)
 
     def wager_or_liar(self, game):
-        self.count_dice()
-        self.calculate_the_minimum_wager_quantity(game)
-        self.calculate_odds_of_required_wager(game)
         self.decide(game)
-
 
 class Game:
 
@@ -327,7 +324,6 @@ class Game:
                 self.players.remove(player)
 
     def choose_active_players(self):
-
         while len(self.active_players) < 2:
             popped_player = self.players.pop(0)
             self.active_players.append(popped_player)
@@ -347,7 +343,6 @@ class Game:
             self.players.append(popped_player)
 
     def reset_players_lists(self):
-
         while len(self.active_players) > 0:
             popped_player = self.active_players.pop(0)
             self.players.append(popped_player)
@@ -355,19 +350,18 @@ class Game:
     def set_first_wager(self, game):
         if self.die_wager == 0 and self.quantity_wager == 0:
             player = self.active_players[0]
-            player.wager(game)
+            player.decide(game)
             if len(self.players) <= 0:
                 self.add_next_active_player()
 
     def play_out_round(self, game):
-
         while self.die_wager != 0 or self.quantity_wager != 0:
             active_player = self.active_players[1]
             previous_active_player = self.active_players[0]
             active_player.wager_or_liar(game)
             if len(self.active_players) > 0:
-                data.append([active_player.name, active_player.die_wager, active_player.minimum_quantity_wager, {i.name:[j.rolled_number for j in i.player_hand] for i in (self.active_players + self.players)}])
-            else :
+                data.append([active_player.name, active_player.die_wager, active_player.quantity_wager, {i.name:[j.rolled_number for j in i.player_hand] for i in (self.active_players + self.players)}])
+            else:
                 data.append([active_player.name, "LIAR", "LIAR", {i.name:[j.rolled_number for j in i.player_hand] for i in (self.active_players + self.players)}])
             if previous_active_player.quantity_wager < active_player.quantity_wager and len(self.players) > 0:
                 self.remove_old_active_player()
@@ -385,7 +379,6 @@ class Game:
         self.check_players_elgibility()
         self.clear_variables_in_players()
 
-
     def clear_wagers(self):
         self.quantity_wager = 0
         self.die_wager = 0
@@ -393,15 +386,12 @@ class Game:
         self.die_wager_counter = 0
 
     def clear_variables_in_players(self):
-
         for player in self.players:
             player.number_of_die_inHand = 0
             player.minimum_quantity_wager = 0
             player.percent_of_unsure_must_be_applicable = 0
 
-
     def play_game(self, game, game_name):
-
         while len(self.players) > 1:
             self.play_round(game)
             # for player in self.players:
