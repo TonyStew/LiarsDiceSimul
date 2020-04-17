@@ -7,7 +7,7 @@ class Dice:
         self.rolled_number = 0
 
     def roll_one_dice(self):
-        self.rolled_number = random.randint(1, 6)
+        self.rolled_number = random.randint(1, 6) #this is where you would change the possible dice faces
 
 data = []
 
@@ -30,20 +30,22 @@ class Player:
         print(f'{self.name} quantity wager: {self.quantity_wager}')
         print(f'{self.name} die wager: {self.die_wager}')
 
+    #init the player's hand of dice
     def fill_hand(self):
-        while len(self.player_hand) < 4:
+        while len(self.player_hand) < 4: #this is where you would change the number of dice per player
             dice = Dice()
             self.player_hand.append(dice)
 
+    #roll all the player's dice
     def roll_hand(self):
         for dice in self.player_hand:
             dice.roll_one_dice()
 
+    #used when a player decides to call liar
     def call_liar(self, game):
         dice_on_table_list = []
-
         print(f'{self.name} called liar')
-
+        #count up the dice
         for player in game.players:
             for dice in player.player_hand:
                 if dice.rolled_number == game.die_wager:
@@ -58,7 +60,7 @@ class Player:
 
         print('The dice on the table are:')
         print(*dice_on_table_list)
-
+        #figure out who was right and have them lose a dice
         if game.quantity_wager > game.die_wager_counter:
             liar = game.active_players[0]
             liar.player_hand.pop(0)
@@ -71,82 +73,11 @@ class Player:
         game.reset_players_lists()
         game.clear_wagers()
         print('')
-        # for player in game.players:
-        #     player.clear_player_wagers()
 
-
+    #reset this players wagers
     def clear_player_wagers(self):
         self.die_wager = 0
         self.quantity_wager = 0
-
-class UserPlayer(Player):
-
-    def __init__(self, name):
-        self.name = name
-        super().__init__()
-
-    def display_dice(self):
-        hand = []
-        print(f'{self.name} dice: ')
-        for dice in self.player_hand:
-            hand.append(dice.rolled_number)
-        print(*hand)
-
-    def wager(self, game):
-
-        if game.quantity_wager == 0 and game.die_wager == 0:
-            self.display_dice()
-
-        ok_wager = False
-
-        while ok_wager == False:
-
-            quantity_wager = int(input("You will enter the die next. What quantity would you like to wager?"))
-            die_wager = int(input("What die would you like to wager?"))
-
-            if quantity_wager > game.quantity_wager:
-                game.quantity_wager = quantity_wager
-                game.die_wager = die_wager
-                self.quantity_wager = quantity_wager
-                self.die_wager = die_wager
-                print(f'{self.name} quantity wager: {game.quantity_wager}')
-                print(f'{self.name} die wagered: {game.die_wager}')
-                ok_wager = True
-            elif quantity_wager < game.quantity_wager:
-                print('Quantity is not higher than previously wagered quantity. Try again')
-            elif quantity_wager == game.quantity_wager:
-                if die_wager > game.die_wager:
-                    game.quantity_wager = quantity_wager
-                    game.die_wager = die_wager
-                    self.quantity_wager = quantity_wager
-                    self.die_wager = die_wager
-                    print(f'{self.name} quantity wager: {game.quantity_wager}')
-                    print(f'{self.name} die wagered: {game.die_wager}')
-                    ok_wager = True
-                elif die_wager <= game.die_wager:
-                    print('The die wager is not larger than previously wagered die. Try again')
-
-        game.add_next_active_player()
-
-
-    def wager_or_liar(self, game):
-        self.display_dice()
-        redo_answer = True
-        while redo_answer:
-            response = input("Would you like to Wager or call liar? Enter w for wager Enter b for liar")
-            if response.lower() == 'b':
-                self.call_liar(game)
-                redo_answer = False
-            elif response.lower() == 'w':
-                self.wager(game)
-                redo_answer = False
-            else:
-                print("Invalid answer choose either w for wager or b for liar.")
-
-    def clear_die_counter(self):
-        # this is here so it can be called on all instances of player maybe I should put it in Parent class
-        pass
-
 
 class ComputerPlayer(Player):
 
@@ -156,6 +87,7 @@ class ComputerPlayer(Player):
         self.name = name
 
         # creates a list of die lists, each die has a number of die, a weighted value, and the number
+        #this code is for the probabilistic model
         self.die1 = [0, 0, 1]
         self.die2 = [0, 0, 2]
         self.die3 = [0, 0, 3]
@@ -224,6 +156,8 @@ class ComputerPlayer(Player):
         elif max_die[2] <= game.die_wager:
             self.minimum_quantity_wager = game.quantity_wager + 1
 
+    #this is the main component of the probabilistic model, it is currently not being called
+    #I only left it as a reference
     def calculate_odds_of_required_wager(self, game):
         # The die object that the computer has the most of
         max_die = self.find_max()
@@ -248,6 +182,7 @@ class ComputerPlayer(Player):
             die[0] = 0
             die[1] = 0
 
+    #this and the next two functions are what determines how the AI players act, if you want to change how they wager, alter this function
     def wager(self, game, dice_vals, most_common):
         if most_common[1] > game.quantity_wager or (most_common[1] == game.quantity_wager and most_common[0] > game.die_wager):
             game.quantity_wager = most_common[1]
@@ -263,6 +198,7 @@ class ComputerPlayer(Player):
         self.print_wager()
         game.add_next_active_player()
 
+    #this function is where the computer players determine if they want to call liar or if they want to wager
     def decide(self, game):
         dice_vals = [i.rolled_number for i in self.player_hand]
         most_common = Counter(dice_vals).most_common(1)[0]
@@ -273,6 +209,7 @@ class ComputerPlayer(Player):
         else:
             self.call_liar(game)
 
+    #this function is called when the game wants this agent to make a move (when it's their turn)
     def wager_or_liar(self, game):
         self.decide(game)
 
@@ -324,6 +261,7 @@ class Game:
             popped_player = self.players.pop(0) #pop a player off the list
             self.active_players.append(popped_player) #add them as the active player
 
+    #add the next player as active
     def add_next_active_player(self):
         if len(self.players) > 0:
             while len(self.active_players) < 3:
@@ -333,11 +271,13 @@ class Game:
             popped_player = self.active_players.pop(0)
             self.active_players.append(popped_player)
 
+    #remove the oldest active player
     def remove_old_active_player(self):
         while len(self.active_players) > 2:
             popped_player = self.active_players.pop(0)
             self.players.append(popped_player)
 
+    #take all the players out of active and put them back into the normal list
     def reset_players_lists(self):
         while len(self.active_players) > 0:
             popped_player = self.active_players.pop(0)
