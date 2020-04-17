@@ -288,11 +288,11 @@ class Game:
 
     def fill_players(self):
         player_names_list = ['Hal', 'Allice', 'WOPR', 'Andy']
-        # while len(self.players) < 1:
+        # while len(self.players) < 1:  #loop for generating the human players
         #     username = input('What is your name?')
         #     player = UserPlayer(username)
         #     self.players.append(player)
-        while len(self.players) < 4:
+        while len(self.players) < 4: #loop for generating AI players
             for player_name in player_names_list:
                 player = ComputerPlayer(player_name)
                 self.players.append(player)
@@ -301,32 +301,28 @@ class Game:
         for player in self.players:
             player.fill_hand()
 
-    # done every round
+    #done every round
     def all_players_roll(self):
         # all players roll dice
         for player in self.players:
             player.roll_hand()
 
-    # does there need to be a method to reset the lists, this is presumably why you use a copy of lists smh
+    #sum all the remaining dice
     def calculate_dice_left(self):
-        for player in self.players:
-            for dice in player.player_hand:
-                self.total_dice_on_table += 1
-        for player in self.active_players:
-            for dice in player.player_hand:
-                self.total_dice_on_table += 1
+        self.total_dice_on_table += sum(len(player.player_hand) for player in self.players)
+        self.total_dice_on_table += sum(len(player.player_hand) for player in self.active_players)
         print(f'{self.total_dice_on_table} dice are on the table')
 
-    def check_players_elgibility(self):
+    def check_players_elgibility(self): #remove losers from the game
         for player in self.players:
-            if len(player.player_hand) == 0:
+            if len(player.player_hand) == 0: #if any player is out of dice
                 print(f'{player.name} is out of dice')
-                self.players.remove(player)
+                self.players.remove(player) #remove them from the player list
 
-    def choose_active_players(self):
-        while len(self.active_players) < 2:
-            popped_player = self.players.pop(0)
-            self.active_players.append(popped_player)
+    def choose_active_players(self): #pick the next player as active
+        while len(self.active_players) < 2: #while there is only one active player
+            popped_player = self.players.pop(0) #pop a player off the list
+            self.active_players.append(popped_player) #add them as the active player
 
     def add_next_active_player(self):
         if len(self.players) > 0:
@@ -347,22 +343,29 @@ class Game:
             popped_player = self.active_players.pop(0)
             self.players.append(popped_player)
 
+    #have the active player start the wagering
     def set_first_wager(self, game):
         if self.die_wager == 0 and self.quantity_wager == 0:
             player = self.active_players[0]
             player.decide(game)
-            if len(self.players) <= 0:
+            if len(self.players) == 0:
                 self.add_next_active_player()
 
+    #have all the players wager until one calls liar
     def play_out_round(self, game):
         while self.die_wager != 0 or self.quantity_wager != 0:
+            #update the current and previous players
             active_player = self.active_players[1]
             previous_active_player = self.active_players[0]
+            #tell the active player to wager or call liar
             active_player.wager_or_liar(game)
             if len(self.active_players) > 0:
+                #add the wager values to the list of data
                 data.append([active_player.name, active_player.die_wager, active_player.quantity_wager, {i.name:[j.rolled_number for j in i.player_hand] for i in (self.active_players + self.players)}])
             else:
+                #add the Liar row to the list of data
                 data.append([active_player.name, "LIAR", "LIAR", {i.name:[j.rolled_number for j in i.player_hand] for i in (self.active_players + self.players)}])
+            #if a player's wager is beat, remove them from the active players
             if previous_active_player.quantity_wager < active_player.quantity_wager and len(self.players) > 0:
                 self.remove_old_active_player()
             elif previous_active_player.quantity_wager == active_player.quantity_wager and len(self.players) > 0:
@@ -370,35 +373,37 @@ class Game:
                     self.remove_old_active_player()
 
     def play_round(self, game):
-        self.check_players_elgibility()
-        self.all_players_roll()
-        self.choose_active_players()
-        self.calculate_dice_left()
-        self.set_first_wager(game)
-        self.play_out_round(game)
-        self.check_players_elgibility()
-        self.clear_variables_in_players()
+        self.check_players_elgibility() #check and remove players with no dice
+        self.all_players_roll() #roll all the players dice
+        self.choose_active_players() #assign the active player to be the next player in the queue
+        self.calculate_dice_left() #update the number of remaining dice
+        self.set_first_wager(game) #have the starting player initiate the betting
+        self.play_out_round(game) #have all the players wager until one calls liar
+        self.check_players_elgibility() #again, check and remove players have lost
+        self.clear_variables_in_players() #reset all players' variables (wagers and dice)
 
+    #reset a player for a new round
     def clear_wagers(self):
         self.quantity_wager = 0
         self.die_wager = 0
         self.total_dice_on_table = 0
         self.die_wager_counter = 0
 
+    #reset all players for a new round
     def clear_variables_in_players(self):
         for player in self.players:
             player.number_of_die_inHand = 0
             player.minimum_quantity_wager = 0
             player.percent_of_unsure_must_be_applicable = 0
 
+    #this function runs the simulation
     def play_game(self, game, game_name):
-        while len(self.players) > 1:
-            self.play_round(game)
-            # for player in self.players:
+        while len(self.players) > 1: #while there is more than one player in the game
+            self.play_round(game) #play a round
+            # for player in self.players: #this is used for the probabilistic model
             #     player.clear_die_counter()
-        for player in self.players:
-            print(f'{player.name} won the game!')
+        for player in self.players: #find the remaining player
+            print(f'{player.name} won the game!') #announce their victory
         import pandas as pd
-        df = pd.DataFrame(data, columns = ['name', 'wager', 'wager_count', 'player_hands'])
-        # print(df)
-        df.to_csv(game_name + '.csv', encoding='utf-8', index=False)
+        df = pd.DataFrame(data, columns = ['name', 'wager', 'wager_count', 'player_hands']) #create a df from the list of rounds
+        df.to_csv(game_name + '.csv', encoding='utf-8', index=False) #save the df as a csv
